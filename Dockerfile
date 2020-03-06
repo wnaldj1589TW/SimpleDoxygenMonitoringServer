@@ -37,7 +37,7 @@ COPY requirements.txt ${WORK_DIR}
 
 RUN pip3 install -qq -r requirements.txt
 
-COPY Auth.json Doxyfile gitRepoMonitor.py start.sh ${WORK_DIR}
+COPY Auth.json Doxyfile src start.sh ${WORK_DIR}
 
 RUN mkdir ${LOG_DIR}
 
