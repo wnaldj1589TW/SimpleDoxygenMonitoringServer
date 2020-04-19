@@ -24,10 +24,10 @@ def readAuth(fname):
         USER = j["USER"]
         API_TOKEN = j["AUTH"]
     except FileNotFoundError:
-        LOG_MSG("[Error] given path is not valid. please set path correctly")
+        ERROR_MSG("[Error] given path is not valid. please set path correctly")
     except json.decoder.JSONDecodeError:
-        LOG_MSG("[Error] format of given auth json file is not proper.")
-        LOG_MSG("[Error] file should be set like {\"USER\":\"USER_NAME\", \"AUTH\":\"TOKEN\"}")
+        ERROR_MSG("[Error] format of given auth json file : {:s} is not proper".format(fname))
+        ERROR_MSG("[Error] file should be set like {\"USER\":\"USER_NAME\", \"AUTH\":\"TOKEN\"}")
     except:
         raise
 
@@ -44,11 +44,11 @@ def downloadRepo(url):
                 and git["archived"] == False \
                 and git["disabled"] == False \
                 and git_url not in GIT_REPOS:
-            LOG_MSG(git_url)
+            INFO_MSG(git_url)
             GIT_REPOS[git_url] = 1
             os.chdir(REPO_DIR)
             os.system("git clone {:s}".format(git_url))
-            LOG_MSG("git clone {:s}".format(git_url))
+            INFO_MSG("git clone {:s}".format(git_url))
 
 def updateRepo():
     global WORK_DIR, REPO_DIR
@@ -64,11 +64,11 @@ def updateRepo():
         try:
             g.pull()
         except:
-            LOG_MSG("[Error] {:s}".format(repo))
+            ERROR_MSG("[Error] {:s}".format(repo))
         os.chdir(repo)
         if isProjectInfoContained(repo):
             os.system("doxygen {:s}/Doxyfile > /dev/null".format(WORK_DIR))
-            LOG_MSG("doxygen {:s}/Doxyfile > /dev/null".format(WORK_DIR))
+            INFO_MSG("doxygen {:s}/Doxyfile > /dev/null".format(WORK_DIR))
 
 def copyDoxygen():
     global WORK_DIR, REPO_DIR
@@ -79,15 +79,15 @@ def copyDoxygen():
             try:
                 os.mkdir("{:s}/{:s}".format(WWW_DIR, packageName))
             except FileExistsError:
-                LOG_MSG("mkdir failed, {:s}/{:s}".format(WWW_DIR, packageName))
+                ERROR_MSG("mkdir failed, {:s}/{:s}".format(WWW_DIR, packageName))
                 pass
             try:
                 os.chdir(repo)
             except FileNotFoundError:
-                LOG_MSG("chdir failed, {:s} not found".format(repo))
+                ERROR_MSG("chdir failed, {:s} not found".format(repo))
                 pass
             os.system("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
-            LOG_MSG("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
+            INFO_MSG("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
 
 def isProjectInfoContained(repo):
     find = False
@@ -98,17 +98,26 @@ def isProjectInfoContained(repo):
             break
     return find
 
-def LOG_MSG(msg):
-    LOG_FILE.write(msg+"\n")
+def INFO_MSG(msg):
+    INFO_LOG = open("{:s}/{:s}.INFO.log".format(LOG_DIR, str(time.time())), "a")
+    INFO_LOG.write(msg+"\n")
+    INFO_LOG.close()
+
+def ERROR_MSG(msg):
+    ERROR_LOG = open("{:s}/{:s}.ERROR.log".format(LOG_DIR, str(time.time())), "w")
+    ERROR_LOG.write(msg+"\n")
+    ERROR_LOG.close()
 
 
 if __name__ == "__main__":
     readAuth("Auth.json")
-    LOG_FILE = open("{:s}/{:s}.LOG_MSG".format(LOG_DIR, str(time.time())), "w")
+
+    if len(GIT_TARGET) == 0:
+        ERROR_MSG("[Error] please set GIT_TARGET in Dockerfile")
+
     while True:
         for i in range(10):
             downloadRepo("/user/repos?page={:d}&per_page=100".format(i))
         updateRepo()
         copyDoxygen()
         time.sleep(3600)
-    LOG_FILE.close()
