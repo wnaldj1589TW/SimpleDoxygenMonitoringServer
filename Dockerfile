@@ -37,7 +37,9 @@ COPY requirements.txt ${WORK_DIR}
 
 RUN pip3 install -qq -r requirements.txt
 
-COPY Auth.json Doxyfile src start.sh ${WORK_DIR}
+COPY Auth.json Doxyfile start.sh ${WORK_DIR}
+
+COPY src ${WORK_DIR}/src
 
 RUN mkdir ${LOG_DIR}
 
