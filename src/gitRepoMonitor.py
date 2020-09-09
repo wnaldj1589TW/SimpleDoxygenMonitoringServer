@@ -17,6 +17,9 @@ LOG_DIR = os.environ["LOG_DIR"]
 GIT_TARGET = os.environ["GIT_TARGET"]
 GIT_REPOS = {}
 
+START_TIME = time.time()
+MONITORING_INTERVAL = 600
+
 def readAuth(fname):
     global USER, API_TOKEN
     try:
@@ -99,12 +102,12 @@ def isProjectInfoContained(repo):
     return find
 
 def INFO_MSG(msg):
-    INFO_LOG = open("{:s}/{:s}.INFO.log".format(LOG_DIR, str(time.time())), "a")
+    INFO_LOG = open("{:s}/{:s}.INFO.log".format(LOG_DIR, str(START_TIME)), "a")
     INFO_LOG.write(msg+"\n")
     INFO_LOG.close()
 
 def ERROR_MSG(msg):
-    ERROR_LOG = open("{:s}/{:s}.ERROR.log".format(LOG_DIR, str(time.time())), "w")
+    ERROR_LOG = open("{:s}/{:s}.ERROR.log".format(LOG_DIR, str(START_TIME))), "w")
     ERROR_LOG.write(msg+"\n")
     ERROR_LOG.close()
 
@@ -120,4 +123,4 @@ if __name__ == "__main__":
             downloadRepo("/user/repos?page={:d}&per_page=100".format(i))
         updateRepo()
         copyDoxygen()
-        time.sleep(3600)
+        time.sleep(MONITORING_INTERVAL)
