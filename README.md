@@ -22,8 +22,7 @@ In this README.md, docker container will use 9999 port as default port.
 Please check 9999 port of your system.  
 
 # 1. Execution
-docker build --tag doxygen_monitor:0.1 --build-arg ssh_pub_key="$(cat ~/.ssh/id_rsa.pub)" --build-arg ssh_prv_key="$(cat ~/.ssh/id_rsa)" .  
-docker run -d -p9999:8888 --name doxygen -v /work/log:./work doxygen_monitor:0.1 ./start.sh
+./run.sh
 
 # 2. Caution
 1. If there is no ProjectInfo.h in include directories in your repository, docker container won't show that repository.  

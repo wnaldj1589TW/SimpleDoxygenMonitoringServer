@@ -4,7 +4,7 @@ MAINTAINER wnaldj1589@twinny.co.kr
 ARG ssh_pub_key
 ARG ssh_prv_key
 
-RUN apt-get update -qq -y
+RUN apt-get update -qq -y --fix-missing
 
 RUN apt-get install -qq -y python3 python3-pip apache2 git doxygen graphviz
 
@@ -37,7 +37,7 @@ COPY requirements.txt ${WORK_DIR}
 
 RUN pip3 install -qq -r requirements.txt
 
-COPY Auth.json Doxyfile start.sh ${WORK_DIR}
+COPY Auth.json Doxyfile start.sh run.sh ${WORK_DIR}
 
 COPY src ${WORK_DIR}/src
 
