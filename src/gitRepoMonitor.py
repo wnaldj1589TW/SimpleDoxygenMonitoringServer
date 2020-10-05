@@ -16,10 +16,13 @@ WORK_DIR = os.environ["WORK_DIR"]
 REPO_DIR = WORK_DIR+"/repos"
 LOG_DIR = os.environ["LOG_DIR"]
 GIT_TARGET = os.environ["GIT_TARGET"]
-GIT_REPOS = {}
 
 START_TIME = time.time()
 MONITORING_INTERVAL = 600
+
+REPO_DOWNLOADED = 0
+REPO_UPDATED = 1
+DOXYGEN_UPDATED = 2
 
 def readAuth(fname):
     global USER, API_TOKEN
@@ -36,8 +39,28 @@ def readAuth(fname):
         ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
         raise
 
-def downloadRepo(url):
-    global USER, API_TOKEN, GIT_REPOS
+def getLockedList():
+    locked_list = {}
+    try:
+        with open(REPO_DIR + "/.repo-lock", "r") as locked_list_file:
+            locked_list = json.load(locked_list_file)
+    except:
+        pass
+    return locked_list
+
+def updateLockedList(locked_list):
+    with open(REPO_DIR + "/.repo-lock", "w") as locked_list_file:
+        json.dump(locked_list, locked_list_file)
+
+def flushLockedList():
+    try:
+        os.remove(REPO_DIR + "/.repo-lock")
+    except:
+        pass
+
+
+def downloadRepo(url, locked_list):
+    global USER, API_TOKEN
     b = '{:s}/token:{:s}'.format(USER, API_TOKEN)
     b = b.encode("UTF-8")
     base64string = base64.b64encode(b).decode("UTF-8")
@@ -47,14 +70,21 @@ def downloadRepo(url):
         git_url = git["ssh_url"]
         if GIT_TARGET in git_url \
                 and git["archived"] == False \
-                and git["disabled"] == False \
-                and git_url not in GIT_REPOS:
-            GIT_REPOS[git_url] = 1
+                and git["disabled"] == False:
+            repo_name = git_url.split("/")[-1]
+            if repo_name in locked_list \
+                    and locked_list[repo_name] >= REPO_DOWNLOADED:
+                continue
             os.chdir(REPO_DIR)
             os.system("git clone {:s}".format(git_url))
             INFO_MSG("git clone {:s}".format(git_url))
+            try:
+                locked_list[repo_name] = REPO_DOWNLOADED
+                updateLockedList(locked_list)
+            except:
+                continue
 
-def updateRepo():
+def updateRepo(locked_list):
     global WORK_DIR, REPO_DIR
 
     def update(repo):
@@ -71,15 +101,20 @@ def updateRepo():
             ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
         os.chdir(repo)
         if isProjectInfoContained(repo):
+            if repo in locked_list \
+                    and locked_list[repo] >= REPO_UPDATED:
+                return
             os.system("doxygen {:s}/Doxyfile".format(WORK_DIR))
             INFO_MSG("doxygen {:s}/Doxyfile in {:s}".format(WORK_DIR, repo))
+            locked_list[repo] = REPO_UPDATED
+            updateLockedList(locked_list)
 
     repos = glob.glob(REPO_DIR+"/*")
     for repo in repos:
         t = threading.Thread(target=update, args=(repo,))
         t.start()
 
-def copyDoxygen():
+def copyDoxygen(locked_list):
     global WORK_DIR, REPO_DIR
     def copy(repo):
         packageName = repo.split("/")[-1]
@@ -99,6 +134,9 @@ def copyDoxygen():
                 ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
             os.system("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
             INFO_MSG("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
+            locked_list[repo] = DOXYGEN_UPDATED 
+            updateLockedList(locked_list)
+
     repos = glob.glob(REPO_DIR+"/*")
     for repo in repos:
         t = threading.Thread(target=copy, args=(repo,))
@@ -131,8 +169,10 @@ if __name__ == "__main__":
         ERROR_MSG("[Error] please set GIT_TARGET in Dockerfile")
 
     while True:
+        locked_list = getLockedList()
         for i in range(10):
-            downloadRepo("/user/repos?page={:d}&per_page=100".format(i))
-        updateRepo()
-        copyDoxygen()
+            downloadRepo("/user/repos?page={:d}&per_page=100".format(i), locked_list)
+        updateRepo(locked_list)
+        copyDoxygen(locked_list)
+        flushLockedList()
         time.sleep(MONITORING_INTERVAL)
