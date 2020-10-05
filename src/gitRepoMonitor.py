@@ -6,6 +6,7 @@ import pprint
 import os, glob, pathlib
 import time
 import git
+import threading
 
 USER = ''
 API_TOKEN = ''
@@ -31,7 +32,8 @@ def readAuth(fname):
     except json.decoder.JSONDecodeError:
         ERROR_MSG("[Error] format of given auth json file : {:s} is not proper".format(fname))
         ERROR_MSG("[Error] file should be set like {\"USER\":\"USER_NAME\", \"AUTH\":\"TOKEN\"}")
-    except:
+    except Exception as e:
+        ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
         raise
 
 def downloadRepo(url):
@@ -47,7 +49,6 @@ def downloadRepo(url):
                 and git["archived"] == False \
                 and git["disabled"] == False \
                 and git_url not in GIT_REPOS:
-            INFO_MSG(git_url)
             GIT_REPOS[git_url] = 1
             os.chdir(REPO_DIR)
             os.system("git clone {:s}".format(git_url))
@@ -56,41 +57,52 @@ def downloadRepo(url):
 def updateRepo():
     global WORK_DIR, REPO_DIR
 
-    repos = glob.glob(REPO_DIR+"/*")
-    for repo in repos:
+    def update(repo):
         g = git.cmd.Git(repo)
         try:
             g.checkout("devel")
             g.checkout("develop")
-        except:
+        except Exception as e:
+            ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
             pass
         try:
             g.pull()
-        except:
-            ERROR_MSG("[Error] {:s}".format(repo))
+        except Exception as e:
+            ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
         os.chdir(repo)
         if isProjectInfoContained(repo):
-            os.system("doxygen {:s}/Doxyfile > /dev/null".format(WORK_DIR))
-            INFO_MSG("doxygen {:s}/Doxyfile > /dev/null".format(WORK_DIR))
+            os.system("doxygen {:s}/Doxyfile".format(WORK_DIR))
+            INFO_MSG("doxygen {:s}/Doxyfile in {:s}".format(WORK_DIR, repo))
+
+    repos = glob.glob(REPO_DIR+"/*")
+    for repo in repos:
+        t = threading.Thread(target=update, args=(repo,))
+        t.start()
 
 def copyDoxygen():
     global WORK_DIR, REPO_DIR
-    repos = glob.glob(REPO_DIR+"/*")
-    for repo in repos:
+    def copy(repo):
         packageName = repo.split("/")[-1]
         if isProjectInfoContained(repo) == True:
             try:
                 os.mkdir("{:s}/{:s}".format(WWW_DIR, packageName))
-            except FileExistsError:
-                ERROR_MSG("mkdir failed, {:s}/{:s}".format(WWW_DIR, packageName))
-                pass
+            except FileExistsError as e:
+                ERROR_MSG("mkdir failed, {:s}/{:s} ".format(WWW_DIR, packageName) + str(e))
+            except Exception as e:
+                ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
+
             try:
                 os.chdir(repo)
-            except FileNotFoundError:
-                ERROR_MSG("chdir failed, {:s} not found".format(repo))
-                pass
+            except FileNotFoundError as e:
+                ERROR_MSG("chdir failed, {:s} not found ".format(repo) + str(e))
+            except Exception as e:
+                ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
             os.system("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
             INFO_MSG("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
+    repos = glob.glob(REPO_DIR+"/*")
+    for repo in repos:
+        t = threading.Thread(target=copy, args=(repo,))
+        t.start()
 
 def isProjectInfoContained(repo):
     find = False
@@ -107,7 +119,7 @@ def INFO_MSG(msg):
     INFO_LOG.close()
 
 def ERROR_MSG(msg):
-    ERROR_LOG = open("{:s}/{:s}.ERROR.log".format(LOG_DIR, str(START_TIME))), "w")
+    ERROR_LOG = open("{:s}/{:s}.ERROR.log".format(LOG_DIR, str(START_TIME)), "w")
     ERROR_LOG.write(msg+"\n")
     ERROR_LOG.close()
 
