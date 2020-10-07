@@ -50,7 +50,7 @@ def getLockedList():
 
 def updateLockedList(locked_list):
     with open(REPO_DIR + "/.repo-lock", "w") as locked_list_file:
-        json.dump(locked_list, locked_list_file)
+        json.dump(locked_list, locked_list_file, indent=4)
 
 def flushLockedList():
     try:
@@ -76,6 +76,8 @@ def downloadRepo(url, locked_list):
                     and locked_list[repo_name] >= REPO_DOWNLOADED:
                 continue
             os.chdir(REPO_DIR)
+            git_url = git_url[3:].replace(":", "/")
+            git_url = "https://{:s}:{:s}".format(USER, API_TOKEN) + git_url
             os.system("git clone {:s}".format(git_url))
             INFO_MSG("git clone {:s}".format(git_url))
             try:
@@ -94,25 +96,30 @@ def updateRepo(locked_list):
             g.checkout("develop")
         except Exception as e:
             ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
-            pass
         try:
             g.pull()
         except Exception as e:
             ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
-        os.chdir(repo)
         if isProjectInfoContained(repo):
+            INFO_MSG("Found ProjectInfo.h in {:s}".format(repo))
             if repo in locked_list \
                     and locked_list[repo] >= REPO_UPDATED:
                 return
-            os.system("doxygen {:s}/Doxyfile".format(WORK_DIR))
+            os.system("cd {:s};doxygen {:s}/Doxyfile".format(repo, WORK_DIR))
             INFO_MSG("doxygen {:s}/Doxyfile in {:s}".format(WORK_DIR, repo))
             locked_list[repo] = REPO_UPDATED
             updateLockedList(locked_list)
+        else:
+            INFO_MSG("No ProjectInfo.h in {:s}".format(repo))
 
     repos = glob.glob(REPO_DIR+"/*")
+    thread_list = []
     for repo in repos:
         t = threading.Thread(target=update, args=(repo,))
         t.start()
+        thread_list.append(t)
+    for t in thread_list:
+        t.join()
 
 def copyDoxygen(locked_list):
     global WORK_DIR, REPO_DIR
@@ -121,17 +128,12 @@ def copyDoxygen(locked_list):
         if isProjectInfoContained(repo) == True:
             try:
                 os.mkdir("{:s}/{:s}".format(WWW_DIR, packageName))
+                INFO_MSG("mkdir {:s}/{:s}".format(WWW_DIR, packageName))
             except FileExistsError as e:
                 ERROR_MSG("mkdir failed, {:s}/{:s} ".format(WWW_DIR, packageName) + str(e))
             except Exception as e:
                 ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
 
-            try:
-                os.chdir(repo)
-            except FileNotFoundError as e:
-                ERROR_MSG("chdir failed, {:s} not found ".format(repo) + str(e))
-            except Exception as e:
-                ERROR_MSG("[Error] {:s} ".format(repo) + str(e))
             os.system("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
             INFO_MSG("cp -r {:s}/html/* {:s}/{:s}".format(repo, WWW_DIR, packageName))
             locked_list[repo] = DOXYGEN_UPDATED 
@@ -141,6 +143,7 @@ def copyDoxygen(locked_list):
     for repo in repos:
         t = threading.Thread(target=copy, args=(repo,))
         t.start()
+        t.join()
 
 def isProjectInfoContained(repo):
     find = False
