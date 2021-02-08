@@ -7,7 +7,7 @@ gitdb==4.0.2
 GitPython==3.1.0
 guacamole==0.9.2
 html5lib==0.999
-httplib2==0.9.1
+httplib2==0.19.0
 Jinja2==2.8
 oauthlib==1.0.3
 padme==1.1.1
